@@ -1,0 +1,1 @@
+export { ContractIcon } from "./ContractIcon";
