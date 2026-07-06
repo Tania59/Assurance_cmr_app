@@ -1,32 +1,33 @@
 import { useState, useMemo } from "react";
-import { Search, X, Users, AlertTriangle, ChevronRight, Plus } from "lucide-react";
-import type { Client, Screen } from "../../../shared/types";
+import { Search, X, Users, ChevronRight, Plus, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { COLORS } from "../../../shared/constants/colors";
-import { daysUntil } from "../../../shared/utils/date";
 import { ScreenHeader } from "../../../shared/components/layout/ScreenHeader";
 import { Avatar } from "../../../shared/components/ui/Avatar";
+import { usePeople } from "../../people/hooks/usePeople";
 
-interface ClientsListProps {
-  clients: Client[];
-  navigate: (s: Screen) => void;
-  openClient: (id: number) => void;
-}
-
-export function ClientsList({ clients, navigate, openClient }: ClientsListProps) {
+export default function ClientsList() {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
-  const filtered = useMemo(
-    () =>
-      clients.filter((c) =>
-        `${c.prenom} ${c.nom} ${c.tel}`.toLowerCase().includes(query.toLowerCase())
-      ),
-    [clients, query]
-  );
+
+  const { data, isLoading, isError } = usePeople({ statut: "CLIENT", per_page: 100 });
+
+  const clients = useMemo(() => {
+    const all = data?.data ?? [];
+    if (!query) return all;
+    const q = query.toLowerCase();
+    return all.filter(
+      (c) =>
+        c.full_name.toLowerCase().includes(q) ||
+        c.telephone.includes(q)
+    );
+  }, [data, query]);
 
   return (
     <div className="flex flex-col h-full">
       <ScreenHeader title="Mes Clients" />
       <div className="flex-1 overflow-y-auto pb-20" style={{ background: COLORS.bg }}>
-        {/* Search bar */}
+        {/* Barre de recherche */}
         <div className="px-4 pt-4 pb-3" style={{ background: COLORS.bg }}>
           <div
             className="flex items-center gap-2 px-3 rounded-xl"
@@ -52,51 +53,61 @@ export function ClientsList({ clients, navigate, openClient }: ClientsListProps)
         </div>
 
         <div className="px-4 flex flex-col gap-2 pb-4">
-          <p className="font-inter text-xs mb-1" style={{ color: COLORS.muted }}>
-            {filtered.length} client{filtered.length !== 1 ? "s" : ""}
-          </p>
-          {filtered.map((c) => {
-            const hasAlert = c.contrats.some((ct) => {
-              const d = daysUntil(ct.echeance);
-              return (ct.statut === "Actif" && d >= 0 && d <= 7) || ct.statut === "Expiré";
-            });
-            const actifs = c.contrats.filter((ct) => ct.statut === "Actif").length;
-            return (
-              <button
-                key={c.id}
-                className="w-full bg-white rounded-xl p-4 flex items-center gap-3 text-left active:opacity-80"
-                style={{
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
-                  border: `1px solid ${COLORS.border}`,
-                }}
-                onClick={() => openClient(c.id)}
-              >
-                <Avatar nom={c.nom} prenom={c.prenom} />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+          {isLoading && (
+            <div className="flex justify-center py-10">
+              <Loader2 size={28} color={COLORS.muted} className="animate-spin" />
+            </div>
+          )}
+
+          {isError && (
+            <p className="font-inter text-sm text-center py-10" style={{ color: COLORS.alert }}>
+              Impossible de charger les clients.
+            </p>
+          )}
+
+          {!isLoading && !isError && (
+            <>
+              <p className="font-inter text-xs mb-1" style={{ color: COLORS.muted }}>
+                {clients.length} client{clients.length !== 1 ? "s" : ""}
+              </p>
+
+              {clients.map((c) => (
+                <button
+                  key={c.id}
+                  className="w-full bg-white rounded-xl p-4 flex items-center gap-3 text-left active:opacity-80"
+                  style={{
+                    boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+                    border: `1px solid ${COLORS.border}`,
+                  }}
+                  onClick={() => navigate(`/clients/${c.id}`)}
+                >
+                  <Avatar nom={c.nom} prenom={c.prenom ?? ""} />
+                  <div className="flex-1 min-w-0">
                     <p className="font-montserrat font-bold text-sm truncate" style={{ color: COLORS.text }}>
-                      {c.prenom} {c.nom}
+                      {c.full_name}
                     </p>
-                    {hasAlert && <AlertTriangle size={13} color={COLORS.alert} />}
+                    <p className="font-jetbrains text-xs mt-0.5" style={{ color: COLORS.muted }}>
+                      {c.telephone}
+                    </p>
+                    {c.profession && (
+                      <p className="font-inter text-xs mt-0.5" style={{ color: COLORS.muted }}>
+                        {c.profession}
+                      </p>
+                    )}
                   </div>
-                  <p className="font-jetbrains text-xs mt-0.5" style={{ color: COLORS.muted }}>
-                    {c.tel}
-                  </p>
-                  <p className="font-inter text-xs mt-0.5" style={{ color: COLORS.muted }}>
-                    {actifs} contrat{actifs !== 1 ? "s" : ""} actif{actifs !== 1 ? "s" : ""}
+                  <ChevronRight size={16} color={COLORS.muted} />
+                </button>
+              ))}
+
+              {clients.length === 0 && (
+                <div className="text-center py-10">
+                  <Users size={36} color={COLORS.muted} className="mx-auto mb-2" />
+                  <p className="font-inter text-sm" style={{ color: COLORS.muted }}>
+                    Aucun client trouvé
                   </p>
                 </div>
-                <ChevronRight size={16} color={COLORS.muted} />
-              </button>
-            );
-          })}
-          {filtered.length === 0 && (
-            <div className="text-center py-10">
-              <Users size={36} color={COLORS.muted} className="mx-auto mb-2" />
-              <p className="font-inter text-sm" style={{ color: COLORS.muted }}>
-                Aucun client trouvé
-              </p>
-            </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -105,7 +116,7 @@ export function ClientsList({ clients, navigate, openClient }: ClientsListProps)
       <button
         className="absolute bottom-20 right-4 w-14 h-14 rounded-full flex items-center justify-center z-20"
         style={{ background: COLORS.primary, boxShadow: "0 4px 16px rgba(10,61,107,0.4)" }}
-        onClick={() => navigate("prod_client_new")}
+        onClick={() => navigate("/clients/nouveau")}
       >
         <Plus size={24} color="#fff" />
       </button>

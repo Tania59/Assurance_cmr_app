@@ -5,6 +5,10 @@
 @tailwind components;
 @tailwind utilities;
 
+html, body, #root {
+  height: 100%;
+}
+
 /* Classes utilitaires personnalisées */
 .font-inter {
   font-family: 'Inter', sans-serif;

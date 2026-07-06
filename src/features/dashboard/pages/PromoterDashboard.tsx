@@ -1,42 +1,34 @@
-import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip, LineChart, Line } from "recharts";
-import { Users, ShieldCheck, TrendingUp, AlertTriangle } from "lucide-react";
-import type{ Screen } from "../../../shared/types";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { Users, ShieldCheck, TrendingUp, Clock, Loader2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { COLORS } from "../../../shared/constants/colors";
 import { fmtDate, TODAY_STR } from "../../../shared/utils/date";
+import { fmtMontant } from "../../../shared/utils/format";
 import { KPICard } from "../../../shared/components/ui/KPICard";
 import { SectionHeader } from "../../../shared/components/layout/SectionHeader";
-import { EQUIPE } from "../../../shared/constants/seed";
+import { useAuth } from "../../../contexts/AuthContext";
+import { useDashboard } from "../hooks/useDashboard";
 
-interface PromoterDashboardProps {
-  navigate: (s: Screen) => void;
-}
+export default function PromoterDashboard() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const prenom   = user?.nom.split(" ")[0] ?? "Promoteur";
 
-export function PromoterDashboard({ navigate }: PromoterDashboardProps) {
-  const totalClients = EQUIPE.reduce((s, m) => s + m.clients, 0);
-  const totalActifs = EQUIPE.reduce((s, m) => s + m.contratsActifs, 0);
-  const avgConv = Math.round(EQUIPE.reduce((s, m) => s + m.conversion, 0) / EQUIPE.length);
-  const retard = EQUIPE.reduce((s, m) => s + m.relancesRetard, 0);
+  const dashQ = useDashboard();
+  const data  = dashQ.data;
 
-  const monthData = [
-    { m: "Jan", v: 88 },
-    { m: "Fév", v: 95 },
-    { m: "Mar", v: 102 },
-    { m: "Avr", v: 110 },
-    { m: "Mai", v: 118 },
-    { m: "Jun", v: 124 },
-  ];
-
-  const perfData = EQUIPE.map((m) => ({
-    name: m.nom.split(" ")[0],
-    v: m.clients,
+  // Graphique barres : répartition des primes par type de contrat
+  const barData = (data?.revenue ?? []).map((r) => ({
+    name: r.type,
+    v:    r.count,
   }));
 
   return (
     <div className="flex flex-col h-full">
-      {/* Header */}
+      {/* En-tête */}
       <div className="px-4 pt-5 pb-4 flex-shrink-0" style={{ background: COLORS.primary }}>
         <p className="font-inter text-sm" style={{ color: "rgba(255,255,255,0.7)" }}>
-          Tableau de bord
+          Bonjour, <span className="font-semibold text-white">{prenom}</span> 👋
         </p>
         <h1 className="font-montserrat font-extrabold text-xl mt-0.5" style={{ color: "#fff" }}>
           Vue Promoteur
@@ -46,110 +38,126 @@ export function PromoterDashboard({ navigate }: PromoterDashboardProps) {
         </p>
       </div>
 
-      {/* Content */}
+      {/* Contenu */}
       <div className="flex-1 overflow-y-auto pb-20" style={{ background: COLORS.bg }}>
+        {/* KPIs */}
         <div className="px-4 pt-4">
-          <div className="grid grid-cols-2 gap-3">
-            <KPICard
-              label="Clients total"
-              value={totalClients}
-              icon={<Users size={18} />}
-              color={COLORS.primary}
-            />
-            <KPICard
-              label="Contrats actifs"
-              value={totalActifs}
-              icon={<ShieldCheck size={18} />}
-              color={COLORS.success}
-            />
-            <KPICard
-              label="Taux conversion"
-              value={`${avgConv}%`}
-              icon={<TrendingUp size={18} />}
-              color={COLORS.secondary}
-            />
-            <KPICard
-              label="Relances retard"
-              value={retard}
-              icon={<AlertTriangle size={18} />}
-              alert={retard > 0}
-            />
-          </div>
+          {dashQ.isLoading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 size={22} color={COLORS.muted} className="animate-spin" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <KPICard
+                label="Clients"
+                value={data?.portfolio.personnes.clients ?? 0}
+                icon={<Users size={18} />}
+                color={COLORS.primary}
+              />
+              <KPICard
+                label="Contrats actifs"
+                value={data?.portfolio.contrats.actifs ?? 0}
+                icon={<ShieldCheck size={18} />}
+                color={COLORS.success}
+              />
+              <KPICard
+                label="Prime totale"
+                value={
+                  data?.portfolio.contrats.prime_totale
+                    ? fmtMontant(data.portfolio.contrats.prime_totale)
+                    : "—"
+                }
+                icon={<TrendingUp size={18} />}
+                color={COLORS.secondary}
+              />
+              <KPICard
+                label="Relances du jour"
+                value={data?.portfolio.relances_aujourd_hui ?? 0}
+                icon={<Clock size={18} />}
+                alert={(data?.portfolio.relances_aujourd_hui ?? 0) > 0}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="px-4 pt-5">
-          <SectionHeader
-            title="Évolution clients"
-            action="Statistiques"
-            onAction={() => navigate("prom_stats")}
-          />
-          <div className="bg-white rounded-xl p-4" style={{ border: `1px solid ${COLORS.border}` }}>
-            <ResponsiveContainer width="100%" height={130}>
-              <LineChart data={monthData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <XAxis
-                  dataKey="m"
-                  tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: COLORS.muted }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: COLORS.muted }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontFamily: "Inter",
-                    fontSize: 12,
-                    borderRadius: 8,
-                    border: `1px solid ${COLORS.border}`,
-                  }}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="v"
-                  stroke={COLORS.primary}
-                  strokeWidth={2.5}
-                  dot={{ fill: COLORS.primary, r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+        {/* Graphique : contrats par type */}
+        {!dashQ.isLoading && barData.length > 0 && (
+          <div className="px-4 pt-5 pb-4">
+            <SectionHeader
+              title="Contrats par type"
+              action="Échéances"
+              onAction={() => navigate("/echeances")}
+            />
+            <div className="bg-white rounded-xl p-4" style={{ border: `1px solid ${COLORS.border}` }}>
+              <ResponsiveContainer width="100%" height={140}>
+                <BarChart data={barData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
+                  <XAxis
+                    dataKey="name"
+                    tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: COLORS.muted }}
+                    axisLine={false}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: COLORS.muted }}
+                    axisLine={false}
+                    tickLine={false}
+                    allowDecimals={false}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      fontFamily: "Inter",
+                      fontSize: 12,
+                      borderRadius: 8,
+                      border: `1px solid ${COLORS.border}`,
+                    }}
+                    formatter={(v: number) => [v, "Contrats"]}
+                  />
+                  <Bar dataKey="v" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
-        </div>
+        )}
 
-        <div className="px-4 pt-5 pb-4">
-          <SectionHeader
-            title="Performance équipe"
-            action="Voir équipe"
-            onAction={() => navigate("prom_equipe")}
-          />
-          <div className="bg-white rounded-xl p-4" style={{ border: `1px solid ${COLORS.border}` }}>
-            <ResponsiveContainer width="100%" height={130}>
-              <BarChart data={perfData} margin={{ top: 4, right: 4, bottom: 0, left: -20 }}>
-                <XAxis
-                  dataKey="name"
-                  tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: COLORS.muted }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 10, fontFamily: "JetBrains Mono", fill: COLORS.muted }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    fontFamily: "Inter",
-                    fontSize: 12,
-                    borderRadius: 8,
-                    border: `1px solid ${COLORS.border}`,
-                  }}
-                />
-                <Bar dataKey="v" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+        {/* Résumé portefeuille */}
+        {!dashQ.isLoading && data && (
+          <div className="px-4 pt-2 pb-4">
+            <SectionHeader
+              title="Portefeuille"
+              action="Clients"
+              onAction={() => navigate("/clients")}
+            />
+            <div className="bg-white rounded-xl p-4 flex flex-col gap-3" style={{ border: `1px solid ${COLORS.border}` }}>
+              <div className="flex justify-between items-center">
+                <span className="font-inter text-sm" style={{ color: COLORS.muted }}>
+                  Total personnes
+                </span>
+                <span className="font-jetbrains font-semibold text-sm" style={{ color: COLORS.text }}>
+                  {data.portfolio.personnes.total}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-inter text-sm" style={{ color: COLORS.muted }}>
+                  Prospects chauds
+                </span>
+                <span className="font-jetbrains font-semibold text-sm" style={{ color: COLORS.alert }}>
+                  {data.portfolio.personnes.hot_prospects}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-inter text-sm" style={{ color: COLORS.muted }}>
+                  Contrats expirant 30j
+                </span>
+                <span
+                  className="font-jetbrains font-semibold text-sm"
+                  style={{ color: data.portfolio.contrats.expirant_30j > 0 ? COLORS.orange : COLORS.text }}
+                >
+                  {data.portfolio.contrats.expirant_30j}
+                </span>
+              </div>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
